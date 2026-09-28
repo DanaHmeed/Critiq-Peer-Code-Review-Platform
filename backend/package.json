@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "db:init": "node src/config/initDb.js && node src/config/migrateAuth.js",
     "db:auth": "node src/config/migrateAuth.js",
+    "auth:secret": "node scripts/generateJwtSecret.js",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

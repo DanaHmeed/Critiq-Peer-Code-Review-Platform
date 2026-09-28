@@ -51,6 +51,8 @@ after(async () => {
 })
 beforeEach(async () => {
   global.fetch = realFetch
+  delete process.env.RESEND_API_KEY
+  delete process.env.EMAIL_FROM
   await db.query('TRUNCATE users CASCADE')
   const result = await db.query("INSERT INTO users(name,email,password_hash,role) VALUES('Test','test@example.com',$1,'requester') RETURNING *", [await bcrypt.hash('valid-password', 4)])
   user = result.rows[0]
@@ -82,13 +84,20 @@ async function githubFlow({ profile = { id: 1234, login: 'octotest', email: 'unv
   }
   return call(`/github/callback?code=test-code&state=${url.searchParams.get('state')}`, undefined, { Cookie: cookie })
 }
+async function exchangeGithub(response, origin = 'http://localhost:5173') {
+  const cookie = response.headers.getSetCookie().find(cookie => cookie.startsWith('critiq-github-handoff=')).split(';')[0]
+  return call('/github/session', {}, { Cookie: cookie, Origin: origin })
+}
 test('GitHub: verified email signup, selected role, callback token, and returning identity', async () => {
   const response = await githubFlow()
   assert.equal(response.status, 302)
   const url = new URL(response.headers.get('location'))
   assert.equal(url.pathname, '/auth/callback')
   assert.equal(url.search, '', 'credentials must not appear in the query string')
-  const token = new URLSearchParams(url.hash.slice(1)).get('token')
+  assert.equal(url.hash, '')
+  const exchanged = await exchangeGithub(response)
+  assert.equal(exchanged.status, 200)
+  const { token } = await exchanged.json()
   const me = await call('/me', undefined, { Authorization: `Bearer ${token}` })
   assert.equal(me.status, 200)
   const account = (await me.json()).user
@@ -96,7 +105,7 @@ test('GitHub: verified email signup, selected role, callback token, and returnin
   assert.equal(account.role, 'reviewer')
   assert.equal('password_hash' in account, false)
   const again = await githubFlow({ emails: [{ email: 'changed@example.com', verified: true }] })
-  const nextToken = new URLSearchParams(new URL(again.headers.get('location')).hash.slice(1)).get('token')
+  const nextToken = (await (await exchangeGithub(again)).json()).token
   assert.equal(jwt.verify(nextToken, process.env.JWT_SECRET).id, account.id)
   assert.equal((await db.query('SELECT id FROM users WHERE github_id=$1', ['1234'])).rowCount, 1)
 })
@@ -129,6 +138,21 @@ test('GitHub: cancellation, missing code, invalid state, and missing configurati
   delete process.env.GITHUB_CLIENT_ID
   try { assert.match(new URL((await call('/github')).headers.get('location')).searchParams.get('error'), /not configured/) }
   finally { process.env.GITHUB_CLIENT_ID = saved }
+})
+test('GitHub: handoff requires browser cookie and trusted origin and can be used only once', async () => {
+  const response = await githubFlow()
+  assert.equal((await exchangeGithub(response, 'https://attacker.example')).status, 403)
+  assert.equal((await call('/github/session', {}, { Origin: process.env.CLIENT_URL })).status, 401)
+  assert.equal((await exchangeGithub(response)).status, 200)
+  assert.equal((await exchangeGithub(response)).status, 401)
+})
+test('GitHub: expired handoff and suspended account cannot start a session', async () => {
+  const response = await githubFlow()
+  await db.query("UPDATE github_handoffs SET expires_at = NOW() - INTERVAL '1 second'")
+  assert.equal((await exchangeGithub(response)).status, 401)
+  const another = await githubFlow()
+  await db.query("UPDATE users SET role='suspended' WHERE github_id='1234'")
+  assert.equal((await exchangeGithub(another)).status, 403)
 })
 test('validation: response explains invalid inputs without echoing passwords', async () => {
   const response = await call('/register', { name: ' ', email: 'bad', password: 'x', role: 'admin' })
@@ -192,4 +216,94 @@ test('reset: anonymous callers cannot obtain an account reset credential', async
   const response = await call('/forgot-password', { email: user.email })
   const body = await response.json()
   assert.equal('resetLink' in body, false, 'anonymous request returned a takeover credential')
+})
+test('reset: previously exposed stateless reset tokens are rejected', async () => {
+  const token = jwt.sign({ userId: user.id, email: user.email, kind: 'password_reset' }, process.env.JWT_SECRET, { expiresIn: '1h' })
+  const response = await call('/reset-password', { token, newPassword: 'new-valid-password' })
+  assert.equal(response.status, 400)
+})
+async function requestReset(email = user.email, failure = false) {
+  process.env.RESEND_API_KEY = 'test-mail-key'
+  process.env.EMAIL_FROM = 'Critiq <test@example.com>'
+  let token
+  global.fetch = async (url, options) => {
+    assert.equal(url, 'https://api.resend.com/emails')
+    const body = JSON.parse(options.body)
+    const link = body.text.match(/http[^\s]+/)[0]
+    token = new URLSearchParams(new URL(link).hash.slice(1)).get('token')
+    return new Response(JSON.stringify({ id: 'test-mail' }), { status: failure ? 503 : 200 })
+  }
+  const response = await call('/forgot-password', { email })
+  return { token, response, body: await response.json() }
+}
+test('reset: email delivery, one-time redemption, new password, and session revocation', async () => {
+  const access = (await (await call('/login', { email: user.email, password: 'valid-password' })).json()).token
+  const { token, response, body } = await requestReset()
+  assert.equal(response.status, 200)
+  assert.equal('resetLink' in body, false)
+  assert.ok(token)
+  const stored = (await db.query('SELECT token_hash FROM password_reset_tokens')).rows[0].token_hash
+  assert.notEqual(stored, token)
+  const responses = await Promise.all([call('/reset-password', { token, newPassword: 'new-password' }), call('/reset-password', { token, newPassword: 'new-password' })])
+  assert.deepEqual(responses.map(r => r.status).sort(), [200, 400])
+  assert.equal((await call('/reset-password', { token, newPassword: 'another-password' })).status, 400)
+  assert.equal((await call('/me', undefined, { Authorization: `Bearer ${access}` })).status, 401)
+  assert.equal((await call('/login', { email: user.email, password: 'valid-password' })).status, 401)
+  assert.equal((await call('/login', { email: user.email, password: 'new-password' })).status, 200)
+})
+test('reset: unknown accounts and delivery failures have the same public response', async () => {
+  const existing = await requestReset()
+  const missing = await requestReset('missing@example.com')
+  assert.deepEqual(existing.body, missing.body)
+  assert.equal(missing.token, undefined)
+  const failed = await requestReset(user.email, true)
+  assert.deepEqual(failed.body, missing.body)
+  assert.equal((await db.query('SELECT * FROM password_reset_tokens')).rowCount, 0)
+})
+test('reset: expired, replaced, malformed and missing reset tokens are rejected', async () => {
+  const first = await requestReset()
+  const second = await requestReset()
+  assert.equal((await call('/reset-password', { token: first.token, newPassword: 'new-password' })).status, 400)
+  await db.query("UPDATE password_reset_tokens SET expires_at = NOW() - INTERVAL '1 second'")
+  for (const token of [second.token, 'invalid', undefined]) assert.equal((await call('/reset-password', { token, newPassword: 'new-password' })).status, 400)
+})
+test('reset: missing email configuration fails clearly for all accounts', async () => {
+  for (const email of [user.email, 'missing@example.com']) {
+    const response = await call('/forgot-password', { email })
+    assert.equal(response.status, 503)
+    assert.match((await response.json()).error, /not configured/)
+  }
+})
+test('configuration: rejects missing or placeholder signing keys and unsafe URL settings', () => {
+  const { validateAuthConfig } = require('../src/config/authConfig')
+  for (const JWT_SECRET of ['', 'short', 'your-placeholder-secret-that-is-long-enough']) assert.throws(() => validateAuthConfig({ JWT_SECRET }), /JWT_SECRET/)
+  const env = { JWT_SECRET: 'a'.repeat(64) }
+  assert.doesNotThrow(() => validateAuthConfig(env))
+  assert.throws(() => validateAuthConfig({ ...env, CLIENT_URL: 'javascript:alert(1)' }), /CLIENT_URL/)
+  assert.throws(() => validateAuthConfig({ ...env, NODE_ENV: 'production', CLIENT_URL: 'http://localhost:5173' }), /HTTPS/)
+})
+test('sessions: expired JWT, missing session, and deleted user are rejected', async () => {
+  const token = (await (await call('/login', { email: user.email, password: 'valid-password' })).json()).token
+  const decoded = jwt.verify(token, process.env.JWT_SECRET)
+  const expired = jwt.sign({ id: decoded.id, kind: 'access' }, process.env.JWT_SECRET, { jwtid: decoded.jti, expiresIn: -1 })
+  assert.equal((await call('/me', undefined, { Authorization: `Bearer ${expired}` })).status, 401)
+  const missing = jwt.sign({ id: user.id, kind: 'access' }, process.env.JWT_SECRET, { jwtid: randomUUID(), expiresIn: '1h' })
+  assert.equal((await call('/me', undefined, { Authorization: `Bearer ${missing}` })).status, 401)
+  await db.query('DELETE FROM users WHERE id=$1', [user.id])
+  assert.equal((await call('/me', undefined, { Authorization: `Bearer ${token}` })).status, 401)
+})
+test('deployment: actual app permits credentialed callback exchange only for the configured frontend', async () => {
+  const app = require('../src/app')
+  const actual = app.listen(0, '127.0.0.1')
+  await new Promise(resolve => actual.once('listening', resolve))
+  try {
+    const url = `http://127.0.0.1:${actual.address().port}/api/auth/github/session`
+    const response = await realFetch(url, { method: 'OPTIONS', headers: { Origin: process.env.CLIENT_URL, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' } })
+    assert.equal(response.status, 204)
+    assert.equal(response.headers.get('access-control-allow-origin'), process.env.CLIENT_URL)
+    assert.equal(response.headers.get('access-control-allow-credentials'), 'true')
+    const rejected = await realFetch(url, { method: 'POST', headers: { Origin: 'https://attacker.example', 'Content-Type': 'application/json' }, body: '{}' })
+    assert.equal(rejected.status, 403)
+    assert.notEqual(rejected.headers.get('access-control-allow-origin'), 'https://attacker.example')
+  } finally { await new Promise(resolve => actual.close(resolve)) }
 })

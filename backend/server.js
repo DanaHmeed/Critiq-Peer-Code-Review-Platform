@@ -1,11 +1,13 @@
 require('dotenv').config()
 
-const app    = require('./src/app')
 const { testConnection } = require('./src/config/db')
+const { validateAuthConfig } = require('./src/config/authConfig')
 
 const PORT = process.env.PORT || 5000
 
 async function start() {
+  validateAuthConfig()
+  const app = require('./src/app')
   // Verify DB connection before accepting traffic
   await testConnection()
 

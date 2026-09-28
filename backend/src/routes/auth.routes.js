@@ -2,7 +2,7 @@
 const express = require('express')
 const { body } = require('express-validator')
 const { register, login, getMe, logout } = require('../controllers/auth.controller')
-const { githubLogin, githubCallback } = require('../controllers/github.controller')
+const { githubLogin, githubCallback, githubSession } = require('../controllers/github.controller')
 const { protect } = require('../middleware/auth')
 const { validate } = require('../middleware/validate')
 const { emailRule, passwordRule } = require('../middleware/authValidation')
@@ -33,7 +33,9 @@ router.post(
 router.get('/me', protect, getMe)
 router.post('/logout', protect, logout)
 
-router.get('/github', githubLogin)
-router.get('/github/callback', githubCallback)
+const { asyncHandler } = require('../middleware/errorHandler')
+router.get('/github', asyncHandler(githubLogin))
+router.get('/github/callback', asyncHandler(githubCallback))
+router.post('/github/session', githubSession)
 
 module.exports = router

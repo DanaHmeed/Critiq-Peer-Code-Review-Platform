@@ -3,7 +3,9 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const { query } = require('../config/db')
 const { signToken } = require('../utils/tokens')
+const { asyncHandler } = require('../middleware/errorHandler')
 const COOKIE = 'critiq-github-state'
+const HANDOFF_COOKIE = 'critiq-github-handoff'
 const clientUrl = () => process.env.CLIENT_URL || 'http://localhost:5173'
 const callbackUrl = () => process.env.GITHUB_CALLBACK_URL || `${(process.env.API_PUBLIC_URL || `http://localhost:${process.env.PORT || 5000}`).replace(/\/$/, '')}/api/auth/github/callback`
 const cookieOptions = () => ({ httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/api/auth/github' })
@@ -12,8 +14,8 @@ function fail(res, message) {
   url.searchParams.set('error', message)
   return res.redirect(url.toString())
 }
-function readCookie(req) {
-  return (req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1)
+function readCookie(req, name = COOKIE) {
+  return (req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${name}=`))?.slice(name.length + 1)
 }
 async function githubJson(url, token) {
   const response = await fetch(url, {
@@ -76,13 +78,28 @@ async function githubCallback(req, res) {
       [(profile.name || profile.login || 'GitHub User').trim().slice(0, 100), email, passwordHash, saved.role, profile.bio || null, githubId])).rows[0]
     }
     if (user.role === 'suspended') return fail(res, 'This account is suspended. Contact the administrator.')
-    const callback = new URL('/auth/callback', clientUrl())
-    // Fragments are never sent to web servers or in Referer headers. The client
-    // removes this immediately, then validates the credential through /me.
-    callback.hash = new URLSearchParams({ token: await signToken(user) }).toString()
-    return res.redirect(callback.toString())
+    const handoff = randomBytes(32).toString('hex')
+    await query('DELETE FROM github_handoffs WHERE expires_at <= NOW()')
+    await query("INSERT INTO github_handoffs (token_hash, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '1 minute')", [createHash('sha256').update(handoff).digest('hex'), user.id])
+    res.cookie(HANDOFF_COOKIE, handoff, { ...cookieOptions(), maxAge: 60000 })
+    return res.redirect(new URL('/auth/callback', clientUrl()).toString())
   } catch (error) {
     return fail(res, error.code === '23505' ? 'This account was just registered. Please sign in again.' : 'GitHub sign-in is temporarily unavailable. Please try again.')
   }
 }
-module.exports = { githubLogin, githubCallback }
+const githubSession = asyncHandler(async (req, res) => {
+  // The SPA must originate this request; cookie possession alone is not enough
+  // for cross-origin scripts to force a session exchange.
+  if (req.get('origin') !== new URL(clientUrl()).origin) return res.status(403).json({ error: 'Invalid sign-in origin' })
+  const handoff = readCookie(req, HANDOFF_COOKIE)
+  res.clearCookie(HANDOFF_COOKIE, cookieOptions())
+  if (!handoff || !/^[a-f0-9]{64}$/.test(handoff)) return res.status(401).json({ error: 'GitHub sign-in expired. Please try again.' })
+  const result = await query('DELETE FROM github_handoffs WHERE token_hash = $1 AND expires_at > NOW() RETURNING user_id', [createHash('sha256').update(handoff).digest('hex')])
+  if (!result.rows[0]) return res.status(401).json({ error: 'GitHub sign-in expired. Please try again.' })
+  const user = (await query('SELECT * FROM users WHERE id = $1', [result.rows[0].user_id])).rows[0]
+  if (!user || user.role === 'suspended') return res.status(403).json({ error: 'This account is unavailable. Contact the administrator.' })
+  const token = await signToken(user)
+  const { password_hash, github_id, ...safe } = user
+  res.json({ token, user: safe })
+})
+module.exports = { githubLogin, githubCallback, githubSession }
