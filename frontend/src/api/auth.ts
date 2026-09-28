@@ -8,6 +8,7 @@ interface AuthResponse {
 
 export const authApi = {
   githubUrl: (role = 'requester') => `${BASE_URL}/auth/github?role=${encodeURIComponent(role)}`,
+  completeGithub: () => api.post<AuthResponse>('/auth/github/session', {}, { credentials: 'include' }),
   login: (body: { email: string; password: string }) =>
     api.post<AuthResponse>('/auth/login', body),
 

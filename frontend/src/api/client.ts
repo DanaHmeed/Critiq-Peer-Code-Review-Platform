@@ -35,7 +35,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
-  })
+  }).catch(() => { throw new ApiError('Could not reach the server. Check your connection and try again.', 0) })
 
   // Handle no-content responses
   if (res.status === 204) return undefined as T
@@ -59,8 +59,8 @@ export const api = {
   get: <T>(endpoint: string, params?: RequestOptions['params'], headers?: HeadersInit) =>
     request<T>(endpoint, { method: 'GET', params, headers }),
 
-  post: <T>(endpoint: string, body: unknown) =>
-    request<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+  post: <T>(endpoint: string, body: unknown, options?: RequestInit) =>
+    request<T>(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
 
   patch: <T>(endpoint: string, body: unknown) =>
     request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),

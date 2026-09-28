@@ -11,12 +11,12 @@ export function AuthCallback() {
   useEffect(() => {
     if (started.current) return
     started.current = true
-    const token = new URLSearchParams(window.location.hash.slice(1)).get('token')
+    const unexpectedCredential = Boolean(window.location.hash || window.location.search)
     window.history.replaceState(null, '', window.location.pathname)
-    if (!token) { setError('Missing GitHub sign-in response. Please try again.'); return }
+    if (unexpectedCredential) { setError('Invalid GitHub sign-in response. Please try again.'); return }
     const destination = safeAuthDestination(sessionStorage.getItem('critiq-return-to'))
     sessionStorage.removeItem('critiq-return-to')
-    completeGithub(token).then(() => navigate(destination, { replace: true })).catch(() => setError('GitHub sign-in could not be completed. Please try again.'))
+    completeGithub().then(() => navigate(destination, { replace: true })).catch(() => setError('GitHub sign-in could not be completed. Please try again.'))
   }, [completeGithub, navigate])
   return <main className="min-h-screen flex items-center justify-center p-6">
     <div role={error ? 'alert' : 'status'}>

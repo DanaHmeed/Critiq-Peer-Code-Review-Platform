@@ -13,7 +13,7 @@ interface AuthContextValue {
   retrySession: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string, role: string) => Promise<void>
-  completeGithub: (token: string) => Promise<void>
+  completeGithub: () => Promise<void>
   logout: () => Promise<boolean>
   updateUser: (updates: Partial<AuthUser>) => void
 }
@@ -74,10 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { token, user } = await authApi.register({ name, email, password, role })
     persist(token, user)
   }
-  const completeGithub = useCallback(async (nextToken: string) => {
+  const completeGithub = useCallback(async () => {
     generation.current++
-    const { user } = await authApi.meWithToken(nextToken)
-    persist(nextToken, user)
+    const { token, user } = await authApi.completeGithub()
+    persist(token, user)
   }, [persist])
   async function logout() {
     try { if (localStorage.getItem('critiq-token')) await authApi.logout() }

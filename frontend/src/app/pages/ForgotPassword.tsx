@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -7,7 +7,6 @@ import { Loader2 } from "lucide-react";
 import { passwordResetApi } from "../../api/passwordReset";
 
 export function ForgotPassword() {
-  const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,14 +21,6 @@ export function ForgotPassword() {
       const res = await passwordResetApi.forgotPassword({ email });
       setMessage(res.message);
 
-      // If backend returns a resetLink with a token, navigate to the reset form.
-      if (res.resetLink) {
-        const url = new URL(res.resetLink);
-        const token = url.searchParams.get("token");
-        if (token) {
-          navigate(`/reset-password?token=${encodeURIComponent(token)}`);
-        }
-      }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to send reset link");
     } finally {
