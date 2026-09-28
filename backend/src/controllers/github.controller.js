@@ -79,7 +79,7 @@ async function githubCallback(req, res) {
     const callback = new URL('/auth/callback', clientUrl())
     // Fragments are never sent to web servers or in Referer headers. The client
     // removes this immediately, then validates the credential through /me.
-    callback.hash = new URLSearchParams({ token: signToken(user) }).toString()
+    callback.hash = new URLSearchParams({ token: await signToken(user) }).toString()
     return res.redirect(callback.toString())
   } catch (error) {
     return fail(res, error.code === '23505' ? 'This account was just registered. Please sign in again.' : 'GitHub sign-in is temporarily unavailable. Please try again.')

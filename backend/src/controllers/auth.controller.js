@@ -28,7 +28,7 @@ const register = asyncHandler(async (req, res) => {
   )
 
   const user  = result.rows[0]
-  const token = signToken(user)
+  const token = await signToken(user)
 
   res.status(201).json({ token, user: sanitizeUser(user) })
 })
@@ -49,7 +49,8 @@ const login = asyncHandler(async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' })
   }
 
-  const token = signToken(user)
+  if (user.role === 'suspended') return res.status(403).json({ error: 'This account is suspended. Contact the administrator.' })
+  const token = await signToken(user)
 
   res.json({ token, user: sanitizeUser(user) })
 })
@@ -67,4 +68,8 @@ const getMe = asyncHandler(async (req, res) => {
   res.json({ user: result.rows[0] })
 })
 
-module.exports = { register, login, getMe }
+const logout = asyncHandler(async (req, res) => {
+  await query('DELETE FROM auth_sessions WHERE id = $1 AND user_id = $2', [req.sessionId, req.user.id])
+  res.status(204).end()
+})
+module.exports = { register, login, getMe, logout }

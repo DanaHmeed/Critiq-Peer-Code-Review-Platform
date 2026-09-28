@@ -1,32 +1,37 @@
 // backend/src/routes/auth.routes.js
 const express = require('express')
 const { body } = require('express-validator')
-const { register, login, getMe, githubLogin, githubCallback } = require('../controllers/auth.controller')
+const { register, login, getMe, logout } = require('../controllers/auth.controller')
+const { githubLogin, githubCallback } = require('../controllers/github.controller')
 const { protect } = require('../middleware/auth')
+const { validate } = require('../middleware/validate')
+const { emailRule, passwordRule } = require('../middleware/authValidation')
 
 const router = express.Router()
+router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next() })
 
 router.post(
   '/register',
   [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('name').isString().withMessage('Name is required').bail().trim().notEmpty().withMessage('Name is required').bail().isLength({ max: 100 }).withMessage('Name must be at most 100 characters'),
+    emailRule(),
+    passwordRule(),
     body('role').isIn(['requester', 'reviewer']).withMessage('Role must be requester or reviewer'),
   ],
-  register
+  validate, register
 )
 
 router.post(
   '/login',
   [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-    body('password').notEmpty().withMessage('Password is required'),
+    emailRule(),
+    passwordRule('password', 1),
   ],
-  login
+  validate, login
 )
 
 router.get('/me', protect, getMe)
+router.post('/logout', protect, logout)
 
 router.get('/github', githubLogin)
 router.get('/github/callback', githubCallback)
