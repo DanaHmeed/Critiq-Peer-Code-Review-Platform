@@ -78,9 +78,8 @@ export function AppSidebar({ isAdmin = false }: AppSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const showAdmin = isAdmin || user?.role === 'admin'
 
-  const handleLogout = () => {
-    logout()
-    navigate('/')
+  const handleLogout = async () => {
+    if (await logout()) navigate('/login', { replace: true })
   }
 
   const sidebarContent = (

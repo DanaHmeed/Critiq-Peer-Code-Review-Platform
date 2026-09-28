@@ -1,92 +1,107 @@
-// frontend/src/app/context/AuthContext.tsx
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 import { authApi } from '../../api/auth'
+import { ApiError } from '../../api/client'
 import type { User } from '../../api/types'
 
-/* ── Types ───────────────────────────────────────────────────────── */
 export type AuthUser = User
-
 interface AuthContextValue {
-  user:    AuthUser | null
-  token:   string | null
+  user: AuthUser | null
+  token: string | null
   loading: boolean
-  login:   (email: string, password: string) => Promise<void>
-  register:(name: string, email: string, password: string, role: string) => Promise<void>
-  logout:  () => void
+  sessionError: string
+  retrySession: () => Promise<void>
+  login: (email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string, role: string) => Promise<void>
+  completeGithub: (token: string) => Promise<void>
+  logout: () => Promise<boolean>
   updateUser: (updates: Partial<AuthUser>) => void
 }
-
-/* ── Context ─────────────────────────────────────────────────────── */
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-/* ── Provider ────────────────────────────────────────────────────── */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user,    setUser]    = useState<AuthUser | null>(null)
-  const [token,   setToken]   = useState<string | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sessionError, setSessionError] = useState('')
+  const generation = useRef(0)
 
-  // Restore session from localStorage on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem('critiq-token')
-    const savedUser  = localStorage.getItem('critiq-user')
-
-    if (savedToken && savedUser) {
-      try {
-        setToken(savedToken)
-        setUser(JSON.parse(savedUser))
-      } catch {
-        localStorage.removeItem('critiq-token')
-        localStorage.removeItem('critiq-user')
-      }
-    }
-    setLoading(false)
+  const clear = useCallback(() => {
+    generation.current++
+    localStorage.removeItem('critiq-token')
+    localStorage.removeItem('critiq-user')
+    setUser(null); setToken(null); setSessionError(''); setLoading(false)
   }, [])
-
-  function persist(token: string, user: AuthUser) {
-    localStorage.setItem('critiq-token', token)
-    localStorage.setItem('critiq-user',  JSON.stringify(user))
-    setToken(token)
-    setUser(user)
-  }
+  const persist = useCallback((nextToken: string, nextUser: AuthUser) => {
+    generation.current++
+    localStorage.setItem('critiq-token', nextToken)
+    localStorage.setItem('critiq-user', JSON.stringify(nextUser))
+    setToken(nextToken); setUser(nextUser); setSessionError(''); setLoading(false)
+  }, [])
+  const retrySession = useCallback(async () => {
+    const current = ++generation.current
+    const savedToken = localStorage.getItem('critiq-token')
+    setLoading(true); setSessionError(''); setUser(null)
+    if (!savedToken) { clear(); return }
+    try {
+      const { user } = await authApi.meWithToken(savedToken)
+      if (current === generation.current) persist(savedToken, user)
+    } catch (error) {
+      if (current !== generation.current) return
+      if (error instanceof ApiError && error.status === 401) clear()
+      else { setSessionError('Unable to check your session. Check your connection and try again.'); setLoading(false) }
+    }
+  }, [clear, persist])
+  useEffect(() => {
+    // The callback establishes its own session; do not race it with restoration.
+    if (window.location.pathname === '/auth/callback') setLoading(false)
+    else void retrySession()
+    const sync = (event: StorageEvent) => { if (!event.key || event.key === 'critiq-token') void retrySession() }
+    window.addEventListener('storage', sync)
+    window.addEventListener('critiq:session-invalid', clear)
+    return () => {
+      generation.current++
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('critiq:session-invalid', clear)
+    }
+  }, [clear, retrySession])
 
   async function login(email: string, password: string) {
     const { token, user } = await authApi.login({ email, password })
     persist(token, user)
   }
-
   async function register(name: string, email: string, password: string, role: string) {
     const { token, user } = await authApi.register({ name, email, password, role })
     persist(token, user)
   }
-
-  function logout() {
-    localStorage.removeItem('critiq-token')
-    localStorage.removeItem('critiq-user')
-    setToken(null)
-    setUser(null)
-    window.location.href = '/login'
+  const completeGithub = useCallback(async (nextToken: string) => {
+    const current = ++generation.current
+    const { user } = await authApi.meWithToken(nextToken)
+    if (current === generation.current) persist(nextToken, user)
+  }, [persist])
+  async function logout() {
+    try { if (localStorage.getItem('critiq-token')) await authApi.logout() }
+    catch (error) {
+      if (!(error instanceof ApiError && error.status === 401)) {
+        toast.error('Could not sign out. Check your connection and try again.')
+        return false
+      }
+    }
+    clear()
+    return true
   }
-
-  // Call this after a profile update so the UI reflects new name/bio instantly
   function updateUser(updates: Partial<AuthUser>) {
-    setUser((prev) => {
-      if (!prev) return prev
-      const updated = { ...prev, ...updates }
+    setUser(previous => {
+      if (!previous) return previous
+      const updated = { ...previous, ...updates }
       localStorage.setItem('critiq-user', JSON.stringify(updated))
       return updated
     })
   }
-
-  return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={{ user, token, loading, sessionError, retrySession, login, register, completeGithub, logout, updateUser }}>{children}</AuthContext.Provider>
 }
-
-/* ── Hook ────────────────────────────────────────────────────────── */
 export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
-  return ctx
+  const context = useContext(AuthContext)
+  if (!context) throw new Error('useAuth must be used inside <AuthProvider>')
+  return context
 }
