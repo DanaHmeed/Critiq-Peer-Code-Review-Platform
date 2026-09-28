@@ -75,9 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persist(token, user)
   }
   const completeGithub = useCallback(async (nextToken: string) => {
-    const current = ++generation.current
+    generation.current++
     const { user } = await authApi.meWithToken(nextToken)
-    if (current === generation.current) persist(nextToken, user)
+    persist(nextToken, user)
   }, [persist])
   async function logout() {
     try { if (localStorage.getItem('critiq-token')) await authApi.logout() }

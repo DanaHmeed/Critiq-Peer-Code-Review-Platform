@@ -1,15 +1,19 @@
 // frontend/src/app/pages/Register.tsx
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useLocation } from 'react-router'
+import { safeAuthDestination } from '../utils/authRedirect'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { useAuth } from '../context/AuthContext'
-import { Code, Eye, Loader2 } from 'lucide-react'
+import { Code, Eye, Github, Loader2 } from 'lucide-react'
+import { authApi } from '../../api/auth'
 import { cn } from '../components/ui/utils'
 
 export function Register() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const destination = safeAuthDestination(location.state?.from)
   const { register } = useAuth()
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: '' })
   const [error,    setError]    = useState('')
@@ -17,12 +21,13 @@ export function Register() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!formData.role) return
+    if (!formData.role) { setError('Choose whether to request reviews or review code first.'); return }
+    if (new TextEncoder().encode(formData.password).length > 72) { setError('Password must be at most 72 UTF-8 bytes.'); return }
     setError('')
     setLoading(true)
     try {
       await register(formData.name, formData.email, formData.password, formData.role)
-      navigate('/dashboard')
+      navigate(destination, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed. Please try again.')
     } finally {
@@ -52,6 +57,8 @@ export function Register() {
               <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
+                autoComplete="name"
+                maxLength={100}
                 type="text"
                 placeholder="John Doe"
                 value={formData.name}
@@ -64,6 +71,7 @@ export function Register() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                autoComplete="email"
                 type="email"
                 placeholder="you@company.com"
                 value={formData.email}
@@ -76,6 +84,7 @@ export function Register() {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                autoComplete="new-password"
                 type="password"
                 placeholder="Min. 6 characters"
                 value={formData.password}
@@ -120,9 +129,18 @@ export function Register() {
             </Button>
           </form>
 
+          <Button type="button" variant="outline" className="w-full mt-5" disabled={loading}
+            onClick={() => {
+              if (!formData.role) { setError('Choose whether to request reviews or review code first.'); return }
+              sessionStorage.setItem('critiq-return-to', destination)
+              window.location.href = authApi.githubUrl(formData.role)
+            }}>
+            <Github className="w-4 h-4" /> Sign up with GitHub
+          </Button>
+
           <p className="mt-6 text-center text-sm text-[var(--muted)]">
             Already have an account?{' '}
-            <Link to="/login" className="text-[var(--accent)] hover:underline">Sign in</Link>
+            <Link to="/login" state={{ from: destination }} className="text-[var(--accent)] hover:underline">Sign in</Link>
           </p>
         </div>
       </div>

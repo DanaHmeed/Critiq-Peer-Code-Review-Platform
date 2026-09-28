@@ -1,6 +1,8 @@
 // frontend/src/app/pages/Login.tsx
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router";
+import { safeAuthDestination } from '../utils/authRedirect';
+import { authApi } from '../../api/auth';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -9,10 +11,13 @@ import { Github, Loader2 } from "lucide-react";
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = safeAuthDestination(location.state?.from);
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(searchParams.get('error') || "");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -21,7 +26,7 @@ export function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/dashboard");
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Invalid email or password",
@@ -111,7 +116,8 @@ export function Login() {
             variant="outline"
             className="w-full"
             onClick={() => {
-              window.location.href = "http://localhost:5000/api/auth/github";
+              sessionStorage.setItem('critiq-return-to', destination);
+              window.location.href = authApi.githubUrl();
             }}
           >
             <Github className="w-4 h-4" />
@@ -122,6 +128,7 @@ export function Login() {
             Don't have an account?{" "}
             <Link
               to="/register"
+              state={{ from: destination }}
               className="text-[var(--accent)] hover:underline"
             >
               Sign up

@@ -1,7 +1,7 @@
 // frontend/src/app/App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router'
 import { Toaster } from './components/ui/sonner'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { AuthProvider } from './context/AuthContext'
 
 import { Landing }        from './pages/Landing'
 import { Login }          from './pages/Login'
@@ -17,32 +17,18 @@ import { AdminDashboard } from './pages/AdminDashboard'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { AuthCallback } from './pages/AuthCallback'
+import { RequireAuth, RequireAdmin, PublicAuth } from './components/AuthGuards'
 
 
 /* ── Guards ──────────────────────────────────────────────────────── */
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
-  if (loading) return null                              // prevent flash
-  return user ? <>{children}</> : <Navigate to="/login" replace />
-}
-
-function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
-  if (loading) return null
-  if (!user)                 return <Navigate to="/login"     replace />
-  if (user.role !== 'admin') return <Navigate to="/dashboard" replace />
-  return <>{children}</>
-}
-
-/* ── Router ──────────────────────────────────────────────────────── */
 function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
         {/* Public */}
         <Route path="/"         element={<Landing />} />
-        <Route path="/login"    element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login"    element={<PublicAuth><Login /></PublicAuth>} />
+        <Route path="/register" element={<PublicAuth><Register /></PublicAuth>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
