@@ -53,6 +53,8 @@ backend/
 
 ## Quick Start
 
+For the authentication audit, exact GitHub/email settings, migration notes, and verification limits, see [AUTH-AUDIT.md](../AUTH-AUDIT.md).
+
 ### 1. Install dependencies
 ```bash
 cd backend
@@ -65,6 +67,11 @@ cp .env.example .env
 # Fill in DB_PASSWORD and JWT_SECRET in .env
 ```
 
+Generate the signing secret directly into `.env` without printing it:
+```bash
+npm run auth:secret
+```
+
 ### 3. Create the database
 ```bash
 # In psql:
@@ -73,7 +80,7 @@ CREATE DATABASE critiq_db;
 
 ### 4. Run the schema migration
 ```bash
-node src/config/initDb.js
+npm run db:init
 ```
 
 ### 5. Start the dev server

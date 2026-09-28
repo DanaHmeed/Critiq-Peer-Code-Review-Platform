@@ -8,7 +8,7 @@ const genericResponse = { message: 'If an eligible account exists for that email
 
 const forgotPassword = asyncHandler(async (req, res) => {
   if (!emailConfigured()) return res.status(503).json({ error: 'Password reset email is not configured. Contact the administrator.' })
-  const user = (await query("SELECT id, email FROM users WHERE lower(email) = $1 AND role <> 'suspended'", [req.body.email])).rows[0]
+  const user = (await query("SELECT id, email FROM users WHERE (lower(email) = $1 OR lower(email) = $2) AND role <> 'suspended' ORDER BY (lower(email) = $1) DESC LIMIT 1", [req.body.email, req.originalEmail])).rows[0]
   if (!user) return res.json(genericResponse)
   const token = randomBytes(32).toString('hex')
   const tokenHash = digest(token)

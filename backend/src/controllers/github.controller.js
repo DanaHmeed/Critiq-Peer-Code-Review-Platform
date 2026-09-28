@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken')
 const { query } = require('../config/db')
 const { signToken } = require('../utils/tokens')
 const { asyncHandler } = require('../middleware/errorHandler')
+const { emailRule } = require('../middleware/authValidation')
+const { validationResult } = require('express-validator')
 const COOKIE = 'critiq-github-state'
 const HANDOFF_COOKIE = 'critiq-github-handoff'
 const clientUrl = () => process.env.CLIENT_URL || 'http://localhost:5173'
@@ -69,8 +71,11 @@ async function githubCallback(req, res) {
       const emails = await githubJson('https://api.github.com/user/emails', tokenData.access_token)
       const verified = emails.find(item => item.verified && item.primary) || emails.find(item => item.verified)
       if (!verified?.email) return fail(res, 'Add a verified email to your GitHub account, then try again.')
-      const email = verified.email.trim().toLowerCase()
-      const existing = await query('SELECT id FROM users WHERE lower(email) = $1', [email])
+      const emailRequest = { body: { email: verified.email } }
+      await emailRule().run(emailRequest)
+      if (!validationResult(emailRequest).isEmpty()) return fail(res, 'GitHub did not provide a usable verified email.')
+      const email = emailRequest.body.email
+      const existing = await query('SELECT id FROM users WHERE lower(email) = $1 OR lower(email) = $2', [email, emailRequest.originalEmail])
       if (existing.rows.length) return fail(res, 'An account already uses your GitHub email. Sign in with email and password; accounts are not linked automatically.')
       const passwordHash = await bcrypt.hash(randomBytes(48).toString('base64url'), 12)
       user = (await query(`INSERT INTO users (name, email, password_hash, role, bio, github_id)

@@ -167,8 +167,8 @@ test('validation: rejects overlong names and passwords before database or bcrypt
     assert.equal(response.status, 400)
   }
 })
-test('validation: email comparison is case insensitive without rewriting aliases', async () => {
-  await db.query('UPDATE users SET email=$1 WHERE id=$2', ['Mixed.Case+tag@gmail.com', user.id])
+test('validation: email comparison preserves legacy normalization and trims input', async () => {
+  await db.query('UPDATE users SET email=$1 WHERE id=$2', ['MixedCase@gmail.com', user.id])
   const response = await call('/login', { email: ' Mixed.Case+tag@gmail.com ', password: 'valid-password' })
   assert.equal(response.status, 200)
 })

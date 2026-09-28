@@ -13,7 +13,7 @@ const register = asyncHandler(async (req, res) => {
   const { name, email, password, role } = req.body
 
   // Check duplicate email
-  const existing = await query('SELECT id FROM users WHERE lower(email) = $1', [email])
+  const existing = await query('SELECT id FROM users WHERE lower(email) = $1 OR lower(email) = $2', [email, req.originalEmail])
   if (existing.rows.length > 0) {
     return res.status(409).json({ error: 'Email already registered' })
   }
@@ -37,7 +37,7 @@ const register = asyncHandler(async (req, res) => {
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body
 
-  const result = await query('SELECT * FROM users WHERE lower(email) = $1', [email])
+  const result = await query('SELECT * FROM users WHERE lower(email) = $1 OR lower(email) = $2 ORDER BY (lower(email) = $1) DESC LIMIT 1', [email, req.originalEmail])
   const user   = result.rows[0]
 
   if (!user) {
