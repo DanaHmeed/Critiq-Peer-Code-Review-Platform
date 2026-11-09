@@ -28,3 +28,12 @@ Review against brief: rejected the existing dark gradient, identical feature car
 ## Verification
 
 Responsive CSS covers mobile, tablet and desktop. Visible keyboard focus, semantic controls, labeled demo composer, persistent line selection and polite announcement of new comments. No marketing claims requiring external proof.
+
+## Completed validation
+
+- Landing production build passed before phase 1 commit.
+- Final production build passed with no CSS import warnings.
+- All 23 existing authentication integration tests passed. Updated role button selectors to follow sentence-case labels and require the selection state attribute.
+- Checked public changes for whitespace errors.
+- Browser visual preview was attempted, but the browser access host was unavailable. Desktop/mobile screenshot review remains unverified.
+- Existing backend/src/app.js edits were excluded from both commits.

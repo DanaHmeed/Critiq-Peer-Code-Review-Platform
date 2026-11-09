@@ -1,3 +1,4 @@
+import { AuthShell } from '../components/public/AuthShell'
 // frontend/src/app/pages/Login.tsx
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router";
@@ -37,18 +38,9 @@ export function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <h1 className="text-2xl font-mono-display mb-2">Critiq</h1>
-          </Link>
-          <p className="text-sm text-[var(--muted)]">Sign in to your account</p>
-        </div>
-
-        <div className="bg-[var(--surface)] border border-border rounded-md p-6 sm:p-8">
+    <AuthShell title="Good to see you again.">
           {error && (
-            <div className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
+            <div role="alert" className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
               {error}
             </div>
           )}
@@ -80,7 +72,7 @@ export function Login() {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -134,8 +126,6 @@ export function Login() {
               Sign up
             </Link>
           </p>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

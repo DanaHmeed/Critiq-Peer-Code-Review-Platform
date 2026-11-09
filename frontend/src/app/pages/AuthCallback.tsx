@@ -18,9 +18,9 @@ export function AuthCallback() {
     sessionStorage.removeItem('critiq-return-to')
     completeGithub().then(() => navigate(destination, { replace: true })).catch(() => setError('GitHub sign-in could not be completed. Please try again.'))
   }, [completeGithub, navigate])
-  return <main className="min-h-screen flex items-center justify-center p-6">
+  return <main className="cq-public cq-callback">
     <div role={error ? 'alert' : 'status'}>
-      <p>{error || 'Completing GitHub sign-in…'}</p>
+      <h1>{error ? "Let us try that again." : "Pulling up your chair."}</h1><p>{error || 'Completing GitHub sign-in...'}</p>
       {error && <Link to="/login" className="underline">Back to sign in</Link>}
     </div>
   </main>

@@ -182,7 +182,7 @@ test('forms: email/password signup submits selected role and displays duplicate 
   global.fetch = async (_url, options) => { submitted = JSON.parse(options.body); return new Response(JSON.stringify({ error: 'Email already registered' }), { status: 409 }) }
   await mount(React.createElement(Register), '/register')
   await fill('name', 'New Person'); await fill('email', 'test@example.com'); await fill('password', 'valid-password')
-  await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Review Code')).click())
+  await act(async () => [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-pressed') !== null && /review code/i.test(b.textContent)).click())
   await submit()
   assert.equal(submitted.role, 'reviewer')
   assert.match(document.body.textContent, /Email already registered/)
@@ -230,7 +230,7 @@ test('forms: successful signup persists the session and wrong password is shown'
   global.fetch = async () => new Response(JSON.stringify({ token: 'signup-test-token', user }), { status: 201 })
   await mount(React.createElement(Register), '/register')
   await fill('name', 'New Person'); await fill('email', 'new@example.com'); await fill('password', 'valid-password')
-  await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Request Reviews')).click())
+  await act(async () => [...document.querySelectorAll('button')].find(b => b.getAttribute('aria-pressed') !== null && /request reviews/i.test(b.textContent)).click())
   await submit()
   assert.equal(localStorage.getItem('critiq-token'), 'signup-test-token')
   global.fetch = async () => new Response(JSON.stringify({ error: 'Invalid email or password' }), { status: 401 })

@@ -1,3 +1,4 @@
+import { AuthShell } from '../components/public/AuthShell'
 // frontend/src/app/pages/Register.tsx
 import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router'
@@ -36,25 +37,16 @@ export function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <h1 className="text-2xl font-mono-display mb-2">Critiq</h1>
-          </Link>
-          <p className="text-sm text-[var(--muted)]">Create your account</p>
-        </div>
-
-        <div className="bg-[var(--surface)] border border-border rounded-md p-6 sm:p-8">
+    <AuthShell title="Find your people.">
           {error && (
-            <div className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
+            <div role="alert" className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">Full name</Label>
               <Input
                 id="name"
                 autoComplete="name"
@@ -98,11 +90,12 @@ export function Register() {
               <Label>I want to</Label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { value: 'requester', icon: Code,  title: 'Request Reviews', desc: 'Submit code for feedback' },
-                  { value: 'reviewer',  icon: Eye,   title: 'Review Code',     desc: 'Provide expert feedback' },
+                  { value: 'requester', icon: Code,  title: 'Request reviews', desc: 'Submit code for feedback' },
+                  { value: 'reviewer',  icon: Eye,   title: 'Review code',     desc: 'Provide expert feedback' },
                 ].map(({ value, icon: Icon, title, desc }) => (
                   <button
                     key={value}
+                    aria-pressed={formData.role === value}
                     type="button"
                     onClick={() => setFormData({ ...formData, role: value })}
                     className={cn(
@@ -122,7 +115,7 @@ export function Register() {
 
             <Button
               type="submit"
-              disabled={!formData.role || loading}
+              disabled={loading}
               className="w-full bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 border-0 disabled:opacity-40"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create account'}
@@ -142,8 +135,6 @@ export function Register() {
             Already have an account?{' '}
             <Link to="/login" state={{ from: destination }} className="text-[var(--accent)] hover:underline">Sign in</Link>
           </p>
-        </div>
-      </div>
-    </div>
-  )
+    </AuthShell>
+  );
 }
