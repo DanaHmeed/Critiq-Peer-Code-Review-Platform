@@ -37,3 +37,15 @@ Responsive CSS covers mobile, tablet and desktop. Visible keyboard focus, semant
 - Checked public changes for whitespace errors.
 - Browser visual preview was attempted, but the browser access host was unavailable. Desktop/mobile screenshot review remains unverified.
 - Existing backend/src/app.js edits were excluded from both commits.
+
+## Authenticated phase: workbench
+
+Extend blue paper, navy ink, cobalt actions and yellow annotations into a restrained working environment. DM Sans handles navigation and dense data; Barlow Condensed is limited to the page title and one useful review prompt. Avoid decorative animation and fabricated live activity. Keep theme switching with a navy dark-paper variant.
+
+    navigation | title + request action
+               | three actionable status counts
+               | searchable review list | resume review / question prompt
+
+The review count strip is functional filtering, not marketing proof. Review rows retain real statuses, notes, reviewers and dates. Creation and review will use the same shell and separate code from discussion without trapping the whole screen in nested scroll regions.
+
+Workbench validation: production build and all 26 frontend tests passed, including combined status/search filtering, retry after failure, and mobile navigation Escape/focus handling. Browser screenshot access remains unavailable: native browser inspection stopped because the current URL could not be determined reliably. No browser inputs were issued afterward.

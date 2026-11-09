@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark'
 
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('critiq-theme') as Theme) || 'dark'
+      const saved = localStorage.getItem('critiq-theme')
+      return saved === 'dark' ? 'dark' : 'light'
     }
-    return 'dark'
+    return 'light'
   })
 
   useEffect(() => {
