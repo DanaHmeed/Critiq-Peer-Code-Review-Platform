@@ -1,4 +1,4 @@
-﻿# Critiq public redesign
+# Critiq public redesign
 
 Audience: developers requesting and giving peer code reviews. Primary job: explain the exchange, let visitors try line feedback, then create an account.
 
@@ -49,3 +49,14 @@ Extend blue paper, navy ink, cobalt actions and yellow annotations into a restra
 The review count strip is functional filtering, not marketing proof. Review rows retain real statuses, notes, reviewers and dates. Creation and review will use the same shell and separate code from discussion without trapping the whole screen in nested scroll regions.
 
 Workbench validation: production build and all 26 frontend tests passed, including combined status/search filtering, retry after failure, and mobile navigation Escape/focus handling. Browser screenshot access remains unavailable: native browser inspection stopped because the current URL could not be determined reliably. No browser inputs were issued afterward.
+
+## Request and review phase
+
+- Reused the workspace list and status filters for all submitted reviews, including rejected requests.
+- Redesigned the three-step request form with native radio choices, a request summary, honest urgency descriptions, and a reviewer-loading retry.
+- Rebuilt the review workspace as code and discussion on the same page, stacking on smaller screens. Line actions are visible and keyboard accessible. Copy feedback reflects actual clipboard success or failure.
+- Kept note drafts after closing the composer or failed submission, including their selected line. Server responses still control published requests, posted notes and completed status. Completion controls reflect the backend's author/reviewer/admin permissions.
+- Production build and all 30 frontend tests passed during validation. Tests cover publishing selected request fields, step-back retention, draft recovery, post failure/retry, completion and clipboard rejection, alongside the existing authentication coverage.
+- Screenshot review remains unavailable because Computer Use could not verify the browser URL. Responsive and theme rules were inspected in source; browser rendering remains unverified.
+
+Next design phase: notifications, profile, settings and administration.
