@@ -169,3 +169,17 @@ POST /api/auth/login  →  { token, user }
 | JWT_SECRET     | Secret for signing JWTs           | long-random-string       |
 | JWT_EXPIRES_IN | Token expiry                      | 7d                       |
 | CLIENT_URL     | Frontend origin (CORS)            | http://localhost:5173    |
+
+## Deploying the API to Render
+
+The local PostgreSQL server on your laptop is separate from a hosted database. Render cannot connect to it using `localhost`.
+
+1. Create or select a hosted PostgreSQL database. For Render Postgres, place it in the same region as the API and copy its **Internal Database URL**.
+2. In the Render web service's Environment settings, set `DATABASE_URL` to that URL. This takes precedence over `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`. Do not commit the URL.
+3. Set `NODE_ENV=production`, `CLIENT_URL` to the deployed frontend origin, and `API_PUBLIC_URL` to the deployed API origin. Set `GITHUB_CALLBACK_URL` to the deployed API origin followed by `/api/auth/github/callback`, and update the GitHub OAuth application to match. Configure the other authentication secrets in Render, not in Git.
+4. Run `npm run db:init` against the hosted database to initialize its tables, then deploy with `npm start`. Initializing a hosted database does not copy existing local users or reviews. To preserve those records in the hosted database, plan a PostgreSQL dump/restore separately before initializing or migrating the destination.
+5. Set the deployed frontend's `VITE_API_URL` to the API origin followed by `/api`, then rebuild the frontend.
+
+For external database providers, use their documented TLS parameters in `DATABASE_URL`; the app does not disable certificate verification. An internal Render database hostname is intended for services on Render's private network, not your laptop.
+
+Reference: https://render.com/docs/postgresql-creating-connecting

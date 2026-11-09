@@ -14,7 +14,7 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`\n🚀  Critiq API running on http://localhost:${PORT}`)
     console.log(`   ENV  : ${process.env.NODE_ENV}`)
-    console.log(`   DB   : ${process.env.DB_NAME}@${process.env.DB_HOST}:${process.env.DB_PORT}\n`)
+    console.log(`   DB   : ${process.env.DATABASE_URL ? 'configured with DATABASE_URL' : 'configured with DB_* settings'}\n`)
   })
 }
 

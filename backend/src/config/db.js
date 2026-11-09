@@ -1,17 +1,8 @@
 // backend/src/config/db.js
 const { Pool } = require('pg')
+const { databaseConfig, describeDatabaseError } = require('./databaseConfig')
 
-const pool = new Pool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     Number(process.env.DB_PORT) || 5432,
-  database: process.env.DB_NAME     || 'critiq_db',
-  user:     process.env.DB_USER     || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  // Keep a small pool for dev; scale up in production
-  max:               10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-})
+const pool = new Pool(databaseConfig())
 
 // Convenience wrapper — returns rows directly
 const query = (text, params) => pool.query(text, params)
@@ -22,8 +13,7 @@ async function testConnection() {
     const res = await pool.query('SELECT NOW() AS now')
     console.log(`✅  DB connected — server time: ${res.rows[0].now}`)
   } catch (err) {
-    console.error('❌  DB connection failed:', err.message)
-    throw err
+    throw new Error(`DB connection failed: ${describeDatabaseError(err)}`)
   }
 }
 
