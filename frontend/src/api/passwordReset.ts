@@ -2,7 +2,7 @@ import { api } from './client'
 
 export const passwordResetApi = {
   forgotPassword: (body: { email: string }) =>
-    api.post<{ message: string; resetLink?: string }>(
+    api.post<{ message: string }>(
       '/auth/forgot-password',
       body,
     ),

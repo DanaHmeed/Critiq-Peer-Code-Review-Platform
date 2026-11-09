@@ -1,20 +1,15 @@
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { AuthShell } from '../components/public/AuthShell'
+import { useState, useEffect } from "react";
+import { Link } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Loader2 } from "lucide-react";
 import { passwordResetApi } from "../../api/passwordReset";
 
-function useQueryParam(name: string) {
-  const { search } = useLocation();
-  return new URLSearchParams(search).get(name);
-}
-
 export function ResetPassword() {
-  const navigate = useNavigate();
-  const token = useQueryParam("token");
-
+  const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') || '');
+  useEffect(() => { window.history.replaceState(null, '', window.location.pathname); }, []);
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
@@ -38,7 +33,8 @@ export function ResetPassword() {
       });
 
       setMessage(res.message || "Password updated successfully");
-      setTimeout(() => navigate("/login"), 800);
+      window.dispatchEvent(new Event('critiq:session-invalid'));
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset password");
     } finally {
@@ -47,23 +43,15 @@ export function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <h1 className="text-2xl font-mono-display mb-2">Critiq</h1>
-          </Link>
-          <p className="text-sm text-[var(--muted)]">Set a new password</p>
-        </div>
-
-        <div className="bg-[var(--surface)] border border-border rounded-md p-6 sm:p-8">
+    <AuthShell title="A fresh start.">
+          {!token && <p role="alert">This reset link is missing or invalid. <Link to="/forgot-password" className="underline">Request a new link</Link>.</p>}
           {message && (
-            <div className="mb-4 px-3 py-2.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded text-sm text-[var(--accent)]">
+            <div role="status" className="mb-4 px-3 py-2.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded text-sm text-[var(--accent)]">
               {message}
             </div>
           )}
           {error && (
-            <div className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
+            <div role="alert" className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
               {error}
             </div>
           )}
@@ -78,13 +66,14 @@ export function ResetPassword() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
+                minLength={6}
                 autoComplete="new-password"
               />
             </div>
 
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !token || Boolean(message)}
               className="w-full bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 border-0 disabled:opacity-60"
             >
               {loading ? (
@@ -101,9 +90,6 @@ export function ResetPassword() {
               Sign in
             </Link>
           </p>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }
-

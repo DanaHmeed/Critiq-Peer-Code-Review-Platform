@@ -1,6 +1,9 @@
+import { AuthShell } from '../components/public/AuthShell'
 // frontend/src/app/pages/Login.tsx
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router";
+import { safeAuthDestination } from '../utils/authRedirect';
+import { authApi } from '../../api/auth';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -9,10 +12,13 @@ import { Github, Loader2 } from "lucide-react";
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = safeAuthDestination(location.state?.from);
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(searchParams.get('error') || "");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -21,7 +27,7 @@ export function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/dashboard");
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Invalid email or password",
@@ -32,18 +38,9 @@ export function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <h1 className="text-2xl font-mono-display mb-2">Critiq</h1>
-          </Link>
-          <p className="text-sm text-[var(--muted)]">Sign in to your account</p>
-        </div>
-
-        <div className="bg-[var(--surface)] border border-border rounded-md p-6 sm:p-8">
+    <AuthShell title="Good to see you again.">
           {error && (
-            <div className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
+            <div role="alert" className="mb-4 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">
               {error}
             </div>
           )}
@@ -75,7 +72,7 @@ export function Login() {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -111,7 +108,8 @@ export function Login() {
             variant="outline"
             className="w-full"
             onClick={() => {
-              window.location.href = "http://localhost:5000/api/auth/github";
+              sessionStorage.setItem('critiq-return-to', destination);
+              window.location.href = authApi.githubUrl();
             }}
           >
             <Github className="w-4 h-4" />
@@ -122,13 +120,12 @@ export function Login() {
             Don't have an account?{" "}
             <Link
               to="/register"
+              state={{ from: destination }}
               className="text-[var(--accent)] hover:underline"
             >
               Sign up
             </Link>
           </p>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

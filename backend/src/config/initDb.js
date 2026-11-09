@@ -106,6 +106,7 @@ async function initDb() {
     console.log('✅  All tables created successfully.')
   } catch (err) {
     console.error('❌  Schema init failed:', err.message)
+    process.exitCode = 1
   } finally {
     await pool.end()
   }

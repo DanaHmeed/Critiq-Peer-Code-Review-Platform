@@ -2,12 +2,12 @@
 function errorHandler(err, req, res, _next) {
   // Log in dev, suppress in prod
   if (process.env.NODE_ENV !== 'production') {
-    console.error(`[${req.method}] ${req.path} →`, err)
+    console.error(`[${req.method}] ${req.path}`, err.code || err.name)
   }
 
   // PostgreSQL unique violation (e.g. duplicate email)
   if (err.code === '23505') {
-    return res.status(409).json({ error: 'A record with that value already exists' })
+    return res.status(409).json({ error: ['users_email_key', 'users_email_lower_unique'].includes(err.constraint) ? 'Email already registered' : 'A record with that value already exists' })
   }
 
   // PostgreSQL foreign key violation
@@ -21,7 +21,7 @@ function errorHandler(err, req, res, _next) {
   }
 
   const status  = err.statusCode || err.status || 500
-  const message = err.message    || 'Internal server error'
+  const message = status >= 500 ? 'Something went wrong. Please try again.' : err.message || 'Request failed'
 
   res.status(status).json({ error: message })
 }
